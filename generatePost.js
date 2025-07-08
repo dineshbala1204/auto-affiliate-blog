@@ -1,54 +1,79 @@
-const puppeteer = require("puppeteer");
-const fs = require("fs");
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
 
-// Set keyword to search for
-const keyword = "tech gadgets under 999";
+// Helper to get today’s date
+const getTodayDate = () => {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
+};
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: "new" });
+  // 🧱 Launch browser in no-sandbox mode (GitHub compatible)
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
   const page = await browser.newPage();
-  const searchUrl = `https://www.amazon.in/s?k=${encodeURIComponent(keyword)}`;
-  await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
 
-  // Wait for product to load
-  await page.waitForSelector(".s-title-instructions-style");
+  // 🌍 Visit Amazon's best sellers page (example: Kitchen)
+  await page.goto('https://www.amazon.in/gp/bestsellers/kitchen/', { waitUntil: 'networkidle2' });
 
-  // Extract first product info
+  // 🧠 Scrape first product
   const product = await page.evaluate(() => {
-    const item = document.querySelector(".s-title-instructions-style");
-    const link = item.querySelector("a")?.href;
-    const title = item.querySelector("h2 span")?.innerText;
-    return { title, link };
+    const el = document.querySelector('.p13n-sc-uncoverable-faceout');
+    if (!el) return null;
+
+    const title = el.querySelector('._cDEzb_p13n-sc-css-line-clamp-3_g3dy1')?.innerText || 'No Title';
+    const url = el.querySelector('a')?.href || '#';
+    const image = el.querySelector('img')?.src || '';
+
+    return { title, url, image };
   });
 
   await browser.close();
 
-  if (!product || !product.link) {
-    console.log("❌ No product found.");
-    return;
+  if (!product) {
+    console.error('❌ No product found');
+    process.exit(1);
   }
 
-  // Add affiliate tag
-  const affiliateLink = product.link + "&tag=dineshtechblo-21";
-  const today = new Date().toISOString().slice(0, 10);
-  const filename = `${today}-trending-product.md`;
+  // 🧾 Create markdown content
+  const mdContent = `---
+title: "${product.title}"
+date: ${getTodayDate()}
+---
 
-  const content = `# ${product.title}
+![Product Image](${product.image})
 
-🔥 Buy now: [Amazon Link](${affiliateLink})
+👉 [Buy Now on Amazon](${product.url}?tag=dineshtechblo-21)
 
-_Auto-posted from trending search: "${keyword}"_`;
+`;
 
-  fs.writeFileSync(filename, content);
-  console.log("✅ Post created:", filename);
+  // 📁 Save markdown post
+  const filename = `${getTodayDate()}-daily-product.md`;
+  fs.writeFileSync(filename, mdContent);
+  console.log(`✅ Blog post created: ${filename}`);
 
-  // Update index.html
-  const allFiles = fs.readdirSync(".").filter(f => f.endsWith(".md")).sort().reverse();
-  let index = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dinesh's Auto Affiliate Blog</title></head><body><h1>Daily Affiliate Blog</h1><ul>`;
-  for (let file of allFiles) {
-    index += `<li><a href="${file}">${file.replace(".md", "")}</a></li>`;
-  }
-  index += `</ul><p style="color:#999">Affiliate ID: dineshtechblo-21</p></body></html>`;
-  fs.writeFileSync("index.html", index);
+  // 🏡 Update index.html (homepage)
+  const homepage = `
+<html>
+<head>
+  <title>Dinesh’s Daily Affiliate Blog</title>
+</head>
+<body>
+  <h1>🔥 Latest Product Pick (${getTodayDate()})</h1>
+  <h2>${product.title}</h2>
+  <img src="${product.image}" width="300" />
+  <br/>
+  <a href="${product.url}?tag=dineshtechblo-21" target="_blank">
+    👉 Buy on Amazon
+  </a>
+</body>
+</html>
+`;
 
+  fs.writeFileSync('index.html', homepage);
+  console.log('✅ index.html updated!');
 })();
