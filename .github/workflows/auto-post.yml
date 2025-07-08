@@ -4,30 +4,41 @@ on:
   push:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # every day at 5:30 AM IST
+    - cron: '0 0 * * *'  # Runs daily at 5:30 AM IST
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install dependencies
+      - name: Install Puppeteer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxss1 libappindicator1 libindicator7 \
+            libnss3 libatk-bridge2.0-0 libgtk-3-0 libasound2 libgbm1
+
+      - name: Install Node packages
         run: npm install
 
-      - name: Generate blog post
+      - name: Run blog generator script
         run: node generatePost.js
 
-      - name: Commit and push
+      - name: Setup authenticated Git remote
         run: |
-          git config --global user.name 'Dinesh Auto Bot'
-          git config --global user.email 'dineshbala1204@gmail.com'
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "Dinesh Auto Bot"
+          git config user.email "dineshbala1204@gmail.com"
           git add .
           git commit -m "🤖 Auto blog post for $(date '+%Y-%m-%d')" || echo "No changes to commit"
           git push
