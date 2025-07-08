@@ -1,43 +1,54 @@
+const puppeteer = require("puppeteer");
 const fs = require("fs");
-const path = require("path");
 
-// 1. Generate a new post file
-const today = new Date().toISOString().slice(0, 10);
-const filename = `${today}-daily-product.md`;
-const content = `# Top Amazon Pick for ${today}
+// Set keyword to search for
+const keyword = "tech gadgets under 999";
 
-Check out this hot deal:  
-[🔥 Amazon Product Link](https://www.amazon.in/dp/B07X1KT61D?tag=dineshtechblo-21)
+(async () => {
+  const browser = await puppeteer.launch({ headless: "new" });
+  const page = await browser.newPage();
+  const searchUrl = `https://www.amazon.in/s?k=${encodeURIComponent(keyword)}`;
+  await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
 
-Auto-generated blog post.`;
+  // Wait for product to load
+  await page.waitForSelector(".s-title-instructions-style");
 
-fs.writeFileSync(filename, content);
+  // Extract first product info
+  const product = await page.evaluate(() => {
+    const item = document.querySelector(".s-title-instructions-style");
+    const link = item.querySelector("a")?.href;
+    const title = item.querySelector("h2 span")?.innerText;
+    return { title, link };
+  });
 
-// 2. Read all `.md` files to build index.html
-const allPosts = fs.readdirSync(".").filter(f => f.endsWith(".md"));
+  await browser.close();
 
-let indexHtml = `<!DOCTYPE html>
-<html><head>
-  <meta charset="UTF-8">
-  <title>Dinesh's Auto Affiliate Blog</title>
-  <style>
-    body { font-family: Arial; padding: 40px; }
-    h1 { color: #333; }
-    ul { padding-left: 20px; }
-    a { text-decoration: none; color: #1a0dab; }
-  </style>
-</head><body>
-<h1>📚 Dinesh's Auto Affiliate Blog</h1>
-<p>Daily updated blog with Amazon affiliate products.</p>
-<ul>
-`;
+  if (!product || !product.link) {
+    console.log("❌ No product found.");
+    return;
+  }
 
-for (let file of allPosts.sort().reverse()) {
-  indexHtml += `<li><a href="${file}">${file.replace(".md", "")}</a></li>\n`;
-}
+  // Add affiliate tag
+  const affiliateLink = product.link + "&tag=dineshtechblo-21";
+  const today = new Date().toISOString().slice(0, 10);
+  const filename = `${today}-trending-product.md`;
 
-indexHtml += `</ul><p style="color:#888">Affiliate ID: <strong>dineshtechblo-21</strong></p></body></html>`;
+  const content = `# ${product.title}
 
-fs.writeFileSync("index.html", indexHtml);
+🔥 Buy now: [Amazon Link](${affiliateLink})
 
-console.log("✅ Blog post + index.html generated.");
+_Auto-posted from trending search: "${keyword}"_`;
+
+  fs.writeFileSync(filename, content);
+  console.log("✅ Post created:", filename);
+
+  // Update index.html
+  const allFiles = fs.readdirSync(".").filter(f => f.endsWith(".md")).sort().reverse();
+  let index = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dinesh's Auto Affiliate Blog</title></head><body><h1>Daily Affiliate Blog</h1><ul>`;
+  for (let file of allFiles) {
+    index += `<li><a href="${file}">${file.replace(".md", "")}</a></li>`;
+  }
+  index += `</ul><p style="color:#999">Affiliate ID: dineshtechblo-21</p></body></html>`;
+  fs.writeFileSync("index.html", index);
+
+})();
