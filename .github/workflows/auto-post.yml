@@ -4,7 +4,7 @@ on:
   push:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # Runs daily at 5:30 AM IST
+    - cron: '0 0 * * *'  # daily at 5:30 AM IST
 
 jobs:
   build:
@@ -22,8 +22,7 @@ jobs:
       - name: Install Puppeteer dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxss1 libappindicator1 libindicator7 \
-            libnss3 libatk-bridge2.0-0 libgtk-3-0 libasound2 libgbm1
+          sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgtk-3-0 libxss1 libgbm1
 
       - name: Install Node packages
         run: npm install
