@@ -1,28 +1,30 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
-const path = require('path');
 
-// Helper to get today’s date
+// 🗓️ Get today's date in YYYY-MM-DD format
 const getTodayDate = () => {
   const now = new Date();
   return now.toISOString().split('T')[0];
 };
 
 (async () => {
-  // 🧱 Launch browser in no-sandbox mode (GitHub compatible)
+  console.log("🚀 Launching browser...");
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: "new",
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
   const page = await browser.newPage();
 
-  // 🌍 Visit Amazon's best sellers page (example: Kitchen)
-  await page.goto('https://www.amazon.in/gp/bestsellers/kitchen/', { waitUntil: 'networkidle2' });
+  console.log("🌐 Navigating to Amazon Best Sellers...");
+  await page.goto('https://www.amazon.in/gp/bestsellers/kitchen/', {
+    waitUntil: 'networkidle2',
+    timeout: 60000
+  });
 
-  // 🧠 Scrape first product
+  console.log("🔍 Scraping product details...");
   const product = await page.evaluate(() => {
-    const el = document.querySelector('.p13n-sc-uncoverable-faceout');
+    const el = document.querySelector('div.zg-grid-general-faceout');
     if (!el) return null;
 
     const title = el.querySelector('._cDEzb_p13n-sc-css-line-clamp-3_g3dy1')?.innerText || 'No Title';
@@ -34,46 +36,44 @@ const getTodayDate = () => {
 
   await browser.close();
 
-  if (!product) {
-    console.error('❌ No product found');
+  if (!product || !product.url || !product.title) {
+    console.error("❌ Failed to extract product data.");
     process.exit(1);
   }
 
-  // 🧾 Create markdown content
+  const today = getTodayDate();
+  const mdFileName = `${today}-daily-product.md`;
+
   const mdContent = `---
 title: "${product.title}"
-date: ${getTodayDate()}
+date: ${today}
 ---
 
 ![Product Image](${product.image})
 
 👉 [Buy Now on Amazon](${product.url}?tag=dineshtechblo-21)
-
 `;
 
-  // 📁 Save markdown post
-  const filename = `${getTodayDate()}-daily-product.md`;
-  fs.writeFileSync(filename, mdContent);
-  console.log(`✅ Blog post created: ${filename}`);
+  fs.writeFileSync(mdFileName, mdContent);
+  console.log(`✅ Blog post created: ${mdFileName}`);
 
-  // 🏡 Update index.html (homepage)
-  const homepage = `
+  const htmlContent = `
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Dinesh’s Daily Affiliate Blog</title>
+  <title>Dinesh’s Auto Blog</title>
 </head>
-<body>
-  <h1>🔥 Latest Product Pick (${getTodayDate()})</h1>
+<body style="font-family: Arial, sans-serif;">
+  <h1>🔥 Latest Product Pick (${today})</h1>
   <h2>${product.title}</h2>
   <img src="${product.image}" width="300" />
-  <br/>
-  <a href="${product.url}?tag=dineshtechblo-21" target="_blank">
-    👉 Buy on Amazon
-  </a>
+  <br><br>
+  <a href="${product.url}?tag=dineshtechblo-21" target="_blank" style="font-size: 18px;">👉 Buy Now on Amazon</a>
+  <p style="margin-top: 50px;">Auto-posted by Dinesh’s bot 🤖</p>
 </body>
 </html>
 `;
 
-  fs.writeFileSync('index.html', homepage);
-  console.log('✅ index.html updated!');
+  fs.writeFileSync('index.html', htmlContent);
+  console.log("✅ index.html updated!");
 })();
