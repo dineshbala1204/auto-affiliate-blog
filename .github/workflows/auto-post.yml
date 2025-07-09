@@ -1,17 +1,16 @@
 name: Auto Blog Poster
 
 on:
-  push:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # daily at 5:30 AM IST
+    - cron: '0 2 * * *' # Runs every day at 2 AM UTC
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repo
         uses: actions/checkout@v3
 
       - name: Setup Node.js
@@ -19,25 +18,24 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Puppeteer dependencies
+      - name: Install Clean Puppeteer
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgtk-3-0 libxss1 libgbm1
+          rm -rf node_modules package-lock.json
+          npm install puppeteer
 
-      - name: Install Node packages
-        run: npm install
-
-      - name: Run blog generator script
+      - name: Generate Blog Post
         run: node generatePost.js
 
-      - name: Setup authenticated Git remote
+      - name: Configure Git
         run: |
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git config --global user.name "Dinesh Auto Bot"
+          git config --global user.email "dineshbala1204@gmail.com"
 
-      - name: Commit and push changes
+      - name: Pull latest changes (avoid push conflict)
+        run: git pull origin main --rebase --autostash
+
+      - name: Commit & Push Changes
         run: |
-          git config user.name "Dinesh Auto Bot"
-          git config user.email "dineshbala1204@gmail.com"
           git add .
-          git commit -m "🤖 Auto blog post for $(date '+%Y-%m-%d')" || echo "No changes to commit"
-          git push
+          git commit -m "🤖 Auto blog post for $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git push origin main
