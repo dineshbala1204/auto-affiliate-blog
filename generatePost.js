@@ -1,79 +1,50 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
-
-// 🗓️ Get today's date in YYYY-MM-DD format
-const getTodayDate = () => {
-  const now = new Date();
-  return now.toISOString().split('T')[0];
-};
+const path = require('path');
 
 (async () => {
-  console.log("🚀 Launching browser...");
+  console.log('🚀 Launching browser...');
   const browser = await puppeteer.launch({
-    headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    headless: 'new',
+    args: ['--no-sandbox']
   });
 
   const page = await browser.newPage();
+  await page.goto('https://www.amazon.in/gp/new-releases/', { waitUntil: 'domcontentloaded' });
 
-  console.log("🌐 Navigating to Amazon Best Sellers...");
-  await page.goto('https://www.amazon.in/gp/bestsellers/kitchen/', {
-    waitUntil: 'networkidle2',
-    timeout: 60000
-  });
-
-  console.log("🔍 Scraping product details...");
   const product = await page.evaluate(() => {
-    const el = document.querySelector('div.zg-grid-general-faceout');
-    if (!el) return null;
+    const titleEl = document.querySelector('.p13n-sc-truncated');
+    const imgEl = document.querySelector('.zg-item img');
+    const linkEl = document.querySelector('.zg-item a');
 
-    const title = el.querySelector('._cDEzb_p13n-sc-css-line-clamp-3_g3dy1')?.innerText || 'No Title';
-    const url = el.querySelector('a')?.href || '#';
-    const image = el.querySelector('img')?.src || '';
-
-    return { title, url, image };
+    return {
+      title: titleEl ? titleEl.innerText.trim() : 'Trending Product',
+      image: imgEl ? imgEl.src : '',
+      link: linkEl ? linkEl.href : ''
+    };
   });
 
   await browser.close();
 
-  if (!product || !product.url || !product.title) {
-    console.error("❌ Failed to extract product data.");
-    process.exit(1);
-  }
+  const affiliateLink = product.link.includes('?') ?
+    `${product.link}&tag=dineshtechblo-21` :
+    `${product.link}?tag=dineshtechblo-21`;
 
-  const today = getTodayDate();
-  const mdFileName = `${today}-daily-product.md`;
+  const today = new Date().toISOString().split('T')[0];
+  const postPath = `_posts/${today}-daily-product.md`;
 
-  const mdContent = `---
+  const content = `---
 title: "${product.title}"
 date: ${today}
 ---
 
-![Product Image](${product.image})
+<img src="${product.image}" alt="${product.title}" style="max-width:100%;"/>
 
-👉 [Buy Now on Amazon](${product.url}?tag=dineshtechblo-21)
+[🛒 Buy on Amazon](${affiliateLink})
 `;
 
-  fs.writeFileSync(mdFileName, mdContent);
-  console.log(`✅ Blog post created: ${mdFileName}`);
+  fs.mkdirSync('_posts', { recursive: true });
+  fs.writeFileSync(postPath, content.trim());
 
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Dinesh’s Auto Blog</title>
-</head>
-<body style="font-family: Arial, sans-serif;">
-  <h1>🔥 Latest Product Pick (${today})</h1>
-  <h2>${product.title}</h2>
-  <img src="${product.image}" width="300" />
-  <br><br>
-  <a href="${product.url}?tag=dineshtechblo-21" target="_blank" style="font-size: 18px;">👉 Buy Now on Amazon</a>
-  <p style="margin-top: 50px;">Auto-posted by Dinesh’s bot 🤖</p>
-</body>
-</html>
-`;
-
-  fs.writeFileSync('index.html', htmlContent);
-  console.log("✅ index.html updated!");
+  console.log(`✅ Blog post created: ${postPath}`);
 })();
